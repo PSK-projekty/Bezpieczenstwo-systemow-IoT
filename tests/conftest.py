@@ -1,4 +1,5 @@
 from collections.abc import Generator
+import os
 import sys
 from pathlib import Path
 
@@ -11,6 +12,9 @@ from sqlalchemy.orm import Session, sessionmaker
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
+
+
+os.environ.setdefault("QT_API", "pyqt5")
 
 from app.api.dependencies import get_app_settings, get_db
 from app.core.config import Settings
