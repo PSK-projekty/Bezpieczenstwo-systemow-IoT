@@ -7,13 +7,17 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_app_settings, get_db, require_admin
 from app.core.config import Settings
-from app.db.models import SecurityEvent, User, UserRole
+from app.db.models import SecurityEvent, SecurityEventStatus, User, UserRole
 from app.schemas.auth import (
     UserCreateAdminRequest,
     UserResponse,
     UserUpdateAdminRequest,
 )
-from app.schemas.event import SecurityEventResponse
+from app.schemas.event import (
+    SecurityEventResponse,
+    SecuritySimulationRequest,
+    SecuritySimulationScenario,
+)
 from app.services.user_service import UserService
 
 
@@ -22,6 +26,25 @@ router = APIRouter(prefix="/admin", tags=["administration"])
 
 def _user_service(db: Session, settings: Settings) -> UserService:
     return UserService(db, settings)
+
+
+SIMULATION_BLUEPRINTS: dict[SecuritySimulationScenario, dict[str, str | SecurityEventStatus]] = {
+    SecuritySimulationScenario.jwt_invalid: {
+        "event_type": "auth_jwt_invalid",
+        "status": SecurityEventStatus.error,
+        "detail": "Symulowany blad: token JWT odrzucony (zly podpis).",
+    },
+    SecuritySimulationScenario.missing_authorization: {
+        "event_type": "auth_missing",
+        "status": SecurityEventStatus.denied,
+        "detail": "Symulowany blad: brak naglowka Authorization.",
+    },
+    SecuritySimulationScenario.device_forbidden: {
+        "event_type": "device_action_denied",
+        "status": SecurityEventStatus.denied,
+        "detail": "Symulowany blad: urzadzenie odrzucone z powodu braku uprawnien.",
+    },
+}
 
 
 @router.get("/security-events", response_model=list[SecurityEventResponse])
@@ -39,6 +62,35 @@ def list_security_events(
     )
     events = stmt.all()
     return [SecurityEventResponse.model_validate(event) for event in events]
+
+
+@router.post(
+    "/security-events/simulate",
+    response_model=SecurityEventResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def simulate_security_event(
+    payload: SecuritySimulationRequest,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_app_settings),
+    admin: User = Depends(require_admin),
+) -> SecurityEventResponse:
+    """Create a synthetic security event for demo and testing purposes."""
+    blueprint = SIMULATION_BLUEPRINTS[payload.scenario]
+    detail = blueprint["detail"]
+    if payload.note:
+        detail = f"{detail} Notatka: {payload.note}."
+    event = SecurityEvent(
+        actor_type="admin_tool",
+        actor_id=str(admin.id),
+        event_type=str(blueprint["event_type"]),
+        status=blueprint["status"],  # type: ignore[arg-type]
+        detail=detail,
+    )
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    return SecurityEventResponse.model_validate(event)
 
 
 @router.get("/users", response_model=list[UserResponse])

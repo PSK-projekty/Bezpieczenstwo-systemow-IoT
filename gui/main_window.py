@@ -128,11 +128,90 @@ class DeviceCreateDialog(QDialog):
         self._build_ui()
 
     def _build_ui(self) -> None:
+        self.setStyleSheet(
+            """
+            QDialog {
+                background-color: #e2e8f0;
+                font-family: "Segoe UI", Arial, sans-serif;
+                color: #0f172a;
+            }
+            QListWidget#categoryList {
+                background-color: #f1f5f9;
+                border: 1px solid #cbd5f5;
+                border-radius: 16px;
+                padding: 12px 8px;
+            }
+            QListWidget#categoryList::item {
+                padding: 10px 12px;
+                margin: 2px 0;
+                border-radius: 10px;
+            }
+            QListWidget#categoryList::item:selected {
+                background-color: #2563eb;
+                color: #ffffff;
+            }
+            QWidget#detailsCard {
+                background-color: #ffffff;
+                border: 1px solid #cbd5f5;
+                border-radius: 18px;
+            }
+            QLabel#dialogSubtitle {
+                color: #475569;
+            }
+            QLabel#categoryBadge {
+                padding: 6px 12px;
+                border-radius: 12px;
+                background-color: #e0e7ff;
+                color: #1e3a8a;
+                font-weight: 600;
+                max-width: 220px;
+            }
+            QTextEdit#payloadPreview {
+                background-color: #f8fafc;
+                border: 1px solid #cbd5f5;
+                border-radius: 14px;
+                padding: 10px;
+            }
+            QLineEdit {
+                background-color: #f8fafc;
+                border: 1px solid #cbd5f5;
+                border-radius: 14px;
+                padding: 10px 12px;
+            }
+            QPushButton {
+                border-radius: 16px;
+                padding: 10px 18px;
+                font-weight: 600;
+            }
+            QPushButton#cancelButton {
+                background-color: #f1f5f9;
+                color: #1e293b;
+                border: 1px solid #cbd5f5;
+            }
+            QPushButton#cancelButton:hover {
+                background-color: #e2e8f0;
+            }
+            QPushButton#primaryButton {
+                background-color: #2563eb;
+                color: #f8fafc;
+                border: none;
+            }
+            QPushButton#primaryButton:hover {
+                background-color: #1d4ed8;
+            }
+            QPushButton#primaryButton:disabled {
+                background-color: #cbd5f5;
+                color: #94a3b8;
+            }
+            """
+        )
+
         layout = QHBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(18)
+        layout.setSpacing(20)
 
         self.list_widget = QListWidget()
+        self.list_widget.setObjectName("categoryList")
         self.list_widget.setFixedWidth(220)
         for category in self._categories:
             item = QListWidgetItem(category["name"])
@@ -142,34 +221,35 @@ class DeviceCreateDialog(QDialog):
         layout.addWidget(self.list_widget)
 
         self.details = QWidget()
+        self.details.setObjectName("detailsCard")
         details_layout = QVBoxLayout(self.details)
-        details_layout.setSpacing(14)
-        self.details.setStyleSheet(
-            """
-            QWidget {
-                background-color: #ffffff;
-                border: 1px solid #cbd5f5;
-                border-radius: 16px;
-                padding: 24px;
-            }
-            """
-        )
+        details_layout.setContentsMargins(28, 28, 28, 28)
+        details_layout.setSpacing(18)
 
         self.title_label = QLabel("Wybierz kategorie")
         self.title_label.setFont(QFont("Segoe UI Semibold", 14))
         details_layout.addWidget(self.title_label)
 
         self.description_label = QLabel("Zaznacz kategorie po lewej stronie, aby zobaczyc szczegoly.")
+        self.description_label.setObjectName("dialogSubtitle")
         self.description_label.setWordWrap(True)
         details_layout.addWidget(self.description_label)
 
+        self.slug_badge = QLabel(" ")
+        self.slug_badge.setObjectName("categoryBadge")
+        self.slug_badge.hide()
+        details_layout.addWidget(self.slug_badge)
+
         self.sample_payload = QTextEdit()
+        self.sample_payload.setObjectName("payloadPreview")
         self.sample_payload.setReadOnly(True)
         self.sample_payload.setFixedHeight(150)
-        self.sample_payload.setStyleSheet("background-color: #f8fafc; border: 1px solid #cbd5f5;")
         details_layout.addWidget(self.sample_payload)
 
         form = QFormLayout()
+        form.setContentsMargins(0, 0, 0, 0)
+        form.setHorizontalSpacing(12)
+        form.setVerticalSpacing(10)
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("np. Stacja pogodowa na dachu")
         form.addRow("Nazwa urzadzenia", self.name_input)
@@ -177,10 +257,13 @@ class DeviceCreateDialog(QDialog):
         details_layout.addStretch(1)
 
         button_row = QHBoxLayout()
+        button_row.setSpacing(12)
         button_row.addStretch(1)
         cancel_btn = QPushButton("Anuluj")
+        cancel_btn.setObjectName("cancelButton")
         cancel_btn.clicked.connect(self.reject)
         create_btn = QPushButton("Utworz")
+        create_btn.setObjectName("primaryButton")
         create_btn.clicked.connect(self._accept)
         button_row.addWidget(cancel_btn)
         button_row.addWidget(create_btn)
@@ -198,6 +281,12 @@ class DeviceCreateDialog(QDialog):
         self._selected = category
         self.title_label.setText(category["name"])
         self.description_label.setText(category["description"])
+        slug = category.get("slug") or ""
+        if slug:
+            self.slug_badge.setText(slug.replace("_", " ").title())
+            self.slug_badge.show()
+        else:
+            self.slug_badge.hide()
         pretty_payload = json.dumps(category["sample_payload"], indent=2, ensure_ascii=False)
         self.sample_payload.setPlainText(pretty_payload)
         self.name_input.setText(category["default_name"])
@@ -366,6 +455,14 @@ class DevicesPage(MessageMixin):
         )
         self.export_button.clicked.connect(self._export_readings)
         filters.addWidget(self.export_button)
+        self.export_txt_button = QPushButton("Eksportuj TXT")
+        self.export_txt_button.setCursor(Qt.PointingHandCursor)
+        self.export_txt_button.setStyleSheet(
+            "QPushButton { background-color: #2563eb; color: #f8fafc; border-radius: 10px; padding: 8px 12px; }"
+            "QPushButton:hover { background-color: #1d4ed8; }"
+        )
+        self.export_txt_button.clicked.connect(self._export_readings_txt)
+        filters.addWidget(self.export_txt_button)
         filters.addStretch(1)
         details_layout.addLayout(filters)
 
@@ -397,11 +494,24 @@ class DevicesPage(MessageMixin):
         details_layout.addWidget(self.meta_total, alignment=Qt.AlignRight)
 
         self.table_hint = QLabel(
-            "Kolumny: Odebrano - czas zapisu, Znacznik urzadzenia - czas z czujnika, "
-            "pozostale kolumny dopasowuja sie do danych wysylanych przez urzadzenie (np. temperatura, wilgotnosc)."
+            "Kolumny stale: Odebrano (czas zapisu), Znacznik urzadzenia (czas z czujnika), "
+            "opcjonalny Status oraz metryki specyficzne dla kategorii."
         )
         self.table_hint.setStyleSheet("color: #475569; font-size: 12px;")
+        self.table_hint.setWordWrap(True)
         details_layout.addWidget(self.table_hint)
+
+        self.legend_title = QLabel("Legenda kategorii")
+        self.legend_title.setStyleSheet("color: #1f2937; font-weight: 600;")
+        details_layout.addWidget(self.legend_title)
+
+        self.legend_body = QLabel(DEFAULT_LEGEND_TEXT)
+        self.legend_body.setWordWrap(True)
+        self.legend_body.setStyleSheet(
+            "color: #475569; font-size: 12px; background-color: #f1f5f9; border: 1px solid #cbd5e1; "
+            "border-radius: 8px; padding: 10px;"
+        )
+        details_layout.addWidget(self.legend_body)
 
         main_layout.addStretch(1)
     def _load_categories(self) -> None:
@@ -450,6 +560,7 @@ class DevicesPage(MessageMixin):
         self.last_reading_label.setText("Ostatni odczyt: -")
         self.readings_table.setRowCount(0)
         self.meta_total.setText("Lacznie odczytow: -")
+        self._render_category_legend(None)
 
     def _update_labels(self, device: dict[str, Any]) -> None:
         detail = device
@@ -465,6 +576,27 @@ class DevicesPage(MessageMixin):
         self.owner_label.setText("Wlasciciel: Ty")
         self.created_label.setText(f"Utworzono: {detail.get('created_at', '-')}")
         self.last_reading_label.setText(f"Ostatni odczyt: {detail.get('last_reading_at', '-')}")
+        self._render_category_legend(detail.get("category"))
+
+    def _render_category_legend(self, category_slug: str | None) -> None:
+        if not category_slug:
+            self.legend_title.setText("Legenda kategorii")
+            self.legend_body.setText(DEFAULT_LEGEND_TEXT)
+            return
+        legend = CATEGORY_LEGENDS.get(str(category_slug))
+        if not legend:
+            self.legend_title.setText(f"Legenda: {category_slug}")
+            self.legend_body.setText(
+                "Brak zdefiniowanej legendy. Kolumny prezentuja surowe metryki przekazane przez urzadzenie."
+            )
+            return
+        self.legend_title.setText(f"Legenda: {legend.get('label', category_slug)}")
+        items = legend.get("items") or []
+        if not items:
+            self.legend_body.setText("Brak dodatkowych opisow metryk dla tej kategorii.")
+            return
+        lines = [f"<b>{name}</b> - {description}" for name, description in items]
+        self.legend_body.setText("<br>".join(lines))
 
     def _reload_current_readings(self) -> None:
         if not self.current_device_id:
@@ -672,6 +804,50 @@ class DevicesPage(MessageMixin):
                         ]
                     )
             self.emit_message("success", f"Wyeksportowano {len(readings)} wierszy.")
+        except OSError as exc:
+            self.emit_message("error", f"Nie udalo sie zapisac pliku: {exc}")
+        finally:
+            self.busy_cursor(False)
+
+    def _export_readings_txt(self) -> None:
+        if not self.current_device_id:
+            return
+        default_name = f"urzadzenie_{self.current_device_id}.txt"
+        target, _ = QFileDialog.getSaveFileName(self, "Zapisz raport tekstowy", default_name, "Plik tekstowy (*.txt)")
+        if not target:
+            return
+        self.busy_cursor(True)
+        try:
+            readings = self.api_client.get_readings(
+                self.current_device_id,
+                limit=self.limit_input.value(),
+                since=self.since_input.text().strip() or None,
+                until=self.until_input.text().strip() or None,
+                include_simulated=True,
+            )
+        except ApiError as exc:
+            self.busy_cursor(False)
+            self.emit_message("error", exc.detail)
+            return
+
+        lines: list[str] = []
+        for index, reading in enumerate(readings, start=1):
+            lines.append(f"Odczyt #{index}")
+            lines.append(f"Odebrano: {reading.get('received_at')}")
+            lines.append(f"Znacznik urzadzenia: {reading.get('device_timestamp')}")
+            lines.append(f"Rozmiar payload: {reading.get('payload_size')}")
+            payload = reading.get("payload")
+            if isinstance(payload, (dict, list)):
+                formatted = json.dumps(payload, ensure_ascii=False, indent=2)
+                lines.append("Payload:")
+                lines.append(formatted)
+            else:
+                lines.append(f"Payload: {payload}")
+            lines.append("-" * 40)
+        try:
+            with Path(target).open("w", encoding="utf-8") as txtfile:
+                txtfile.write("\n".join(lines) if lines else "Brak danych do zapisania.")
+            self.emit_message("success", f"Zapisano raport TXT ({len(readings)} wpisow).")
         except OSError as exc:
             self.emit_message("error", f"Nie udalo sie zapisac pliku: {exc}")
         finally:
@@ -913,6 +1089,30 @@ class SecurityEventsPage(MessageMixin):
         layout.addWidget(header)
 
         top_row = QHBoxLayout()
+        top_row.setSpacing(10)
+        self.scenario_combo = QComboBox()
+        self.scenario_combo.addItem("Blad JWT (podpis nieprawidlowy)", "jwt_invalid")
+        self.scenario_combo.addItem("Brak autoryzacji", "missing_authorization")
+        self.scenario_combo.addItem("Odmowa dla urzadzenia", "device_forbidden")
+        self.scenario_combo.setStyleSheet(
+            "QComboBox { border: 1px solid #cbd5f5; border-radius: 8px; padding: 6px 10px; }"
+        )
+        self.note_input = QLineEdit()
+        self.note_input.setPlaceholderText("Opcjonalna notatka")
+        self.note_input.setStyleSheet(
+            "QLineEdit { border: 1px solid #cbd5f5; border-radius: 8px; padding: 6px 10px; }"
+        )
+        self.simulate_button = QPushButton("Symuluj zdarzenie")
+        self.simulate_button.setCursor(Qt.PointingHandCursor)
+        self.simulate_button.setStyleSheet(
+            "QPushButton { background-color: #2563eb; color: #f8fafc; border-radius: 10px; padding: 8px 12px; }"
+            "QPushButton:hover { background-color: #1d4ed8; }"
+        )
+        self.simulate_button.clicked.connect(self._simulate_event)
+        top_row.addWidget(QLabel("Symulacja"))
+        top_row.addWidget(self.scenario_combo)
+        top_row.addWidget(self.note_input)
+        top_row.addWidget(self.simulate_button)
         top_row.addStretch(1)
         self.refresh_button = QPushButton("Odswiez")
         self.refresh_button.setCursor(Qt.PointingHandCursor)
@@ -967,6 +1167,21 @@ class SecurityEventsPage(MessageMixin):
                 self.table.setItem(row, 3, QTableWidgetItem(str(event.get("event_type"))))
                 self.table.setItem(row, 4, QTableWidgetItem(str(event.get("status"))))
             self.emit_message("info", f"Pobrano {len(events)} zdarzen bezpieczenstwa.")
+        except ApiError as exc:
+            self.emit_message("error", exc.detail)
+        finally:
+            self.busy_cursor(False)
+
+    def _simulate_event(self) -> None:
+        scenario = self.scenario_combo.currentData()
+        note = self.note_input.text().strip() or None
+        self.busy_cursor(True)
+        try:
+            result = self.api_client.simulate_security_event(scenario=scenario, note=note)
+            detail = result.get("detail", "Dodano zdarzenie.")
+            self.emit_message("success", detail)
+            self.note_input.clear()
+            self.refresh_events()
         except ApiError as exc:
             self.emit_message("error", exc.detail)
         finally:

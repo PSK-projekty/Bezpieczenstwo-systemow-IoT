@@ -117,6 +117,10 @@ class AuthDialog(QDialog):
             QLineEdit:focus {
                 border: 1px solid #2563eb;
             }
+            QLineEdit[invalid="true"] {
+                border: 1px solid #dc2626;
+                background-color: #fef2f2;
+            }
             QPushButton#primaryButton {
                 background-color: #2563eb;
                 color: #f8fafc;
@@ -144,11 +148,16 @@ class AuthDialog(QDialog):
             QPushButton#linkButton:hover {
                 text-decoration: underline;
             }
-            QLabel#errorLabel {
-                color: #dc2626;
+            #errorContainer {
                 background-color: rgba(220, 38, 38, 0.08);
-                border-radius: 10px;
-                padding: 10px 14px;
+                border-radius: 12px;
+            }
+            QLabel#errorIcon {
+                color: #dc2626;
+                font-size: 18px;
+            }
+            QLabel#errorLabel {
+                color: #b91c1c;
             }
             QLabel#footerLabel {
                 color: #94a3b8;
@@ -186,10 +195,6 @@ class AuthDialog(QDialog):
         side_layout.setContentsMargins(36, 48, 36, 48)
         side_layout.setSpacing(18)
 
-        badge = QLabel("Bezpieczeństwo")
-        badge.setAlignment(Qt.AlignCenter)
-        badge.setObjectName("badgeLabel")
-
         side_title = QLabel("System IoT klasy enterprise")
         side_title.setObjectName("sideTitle")
         side_title.setWordWrap(True)
@@ -206,7 +211,6 @@ class AuthDialog(QDialog):
             "Jednolite zarządzanie zespołami i uprawnieniami.",
         ]
 
-        side_layout.addWidget(badge, alignment=Qt.AlignLeft)
         side_layout.addSpacing(12)
         side_layout.addWidget(side_title)
         side_layout.addWidget(side_description)
@@ -243,10 +247,23 @@ class AuthDialog(QDialog):
         form_layout.addWidget(self.title_label)
         form_layout.addWidget(self.subtitle_label)
 
+        self.error_container = QFrame()
+        self.error_container.setObjectName("errorContainer")
+        self.error_container.hide()
+        error_layout = QHBoxLayout(self.error_container)
+        error_layout.setContentsMargins(14, 12, 14, 12)
+        error_layout.setSpacing(12)
+
+        self.error_icon = QLabel("⚠️")
+        self.error_icon.setObjectName("errorIcon")
+        error_layout.addWidget(self.error_icon, 0, Qt.AlignTop)
+
         self.error_label = QLabel("")
         self.error_label.setObjectName("errorLabel")
-        self.error_label.hide()
-        form_layout.addWidget(self.error_label)
+        self.error_label.setWordWrap(True)
+        self.error_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        error_layout.addWidget(self.error_label, 1)
+        form_layout.addWidget(self.error_container)
 
         form_grid = QGridLayout()
         form_grid.setVerticalSpacing(14)
@@ -301,6 +318,9 @@ class AuthDialog(QDialog):
         self.email_input.setFont(font)
         self.password_input.setFont(font)
 
+        self.email_input.textChanged.connect(self._reset_error_state)
+        self.password_input.textChanged.connect(self._reset_error_state)
+
     def _toggle_mode(self) -> None:
         self.mode = "register" if self.mode == "login" else "login"
         if self.mode == "login":
@@ -317,19 +337,32 @@ class AuthDialog(QDialog):
             self.subtitle_label.setText(
                 "Utwórz konto, aby monitorować i chronić swoje urządzenia IoT."
             )
-        self.error_label.hide()
-        self.error_label.clear()
+        self._reset_error_state()
         self.password_input.clear()
 
     def _handle_submit(self) -> None:
         email = self.email_input.text().strip()
         password = self.password_input.text()
 
-        if not email or not password:
-            self._show_error("Uzupełnij adres e-mail oraz hasło.")
+        missing_email = not email
+        missing_password = not password
+        if missing_email or missing_password:
+            message = "Uzupełnij adres e-mail oraz hasło."
+            if missing_email and not missing_password:
+                message = "Uzupełnij adres e-mail."
+            elif missing_password and not missing_email:
+                message = "Uzupełnij hasło."
+            fields = []
+            if missing_email:
+                fields.append(self.email_input)
+            if missing_password:
+                fields.append(self.password_input)
+            self._show_error(message, highlight_fields=fields)
             return
         if len(password) < 8:
-            self._show_error("Hasło powinno zawierać co najmniej 8 znaków.")
+            self._show_error(
+                "Hasło powinno zawierać co najmniej 8 znaków.", highlight_fields=[self.password_input]
+            )
             return
 
         self._set_busy(True)
@@ -352,9 +385,13 @@ class AuthDialog(QDialog):
 
         self.accept()
 
-    def _show_error(self, message: str) -> None:
+    def _show_error(self, message: str, *, highlight_fields: list[QLineEdit] | None = None) -> None:
         self.error_label.setText(message)
-        self.error_label.show()
+        self.error_container.show()
+        highlight_fields = highlight_fields or []
+        highlight_set = set(highlight_fields)
+        for field in (self.email_input, self.password_input):
+            self._set_field_invalid(field, field in highlight_set)
 
     def _set_busy(self, busy: bool) -> None:
         self.submit_button.setEnabled(not busy)
@@ -365,3 +402,19 @@ class AuthDialog(QDialog):
         elif not busy and self._busy:
             QApplication.restoreOverrideCursor()
             self._busy = False
+
+    def _reset_error_state(self) -> None:
+        if self.error_container.isHidden() and all(
+            field.property("invalid") != True for field in (self.email_input, self.password_input)
+        ):
+            return
+        self.error_container.hide()
+        self.error_label.clear()
+        for field in (self.email_input, self.password_input):
+            self._set_field_invalid(field, False)
+
+    def _set_field_invalid(self, field: QLineEdit, invalid: bool) -> None:
+        field.setProperty("invalid", bool(invalid))
+        field.style().unpolish(field)
+        field.style().polish(field)
+        field.update()

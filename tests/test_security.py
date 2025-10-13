@@ -53,3 +53,26 @@ def test_user_token_not_valid_for_device_channel(client: TestClient) -> None:
         json={"payload": {"value": 10}},
     )
     assert misuse.status_code == HTTPStatus.UNAUTHORIZED
+
+
+def test_admin_can_simulate_security_event(client: TestClient) -> None:
+    """Administrator should register synthetic entries in the security log."""
+    login = client.post("/auth/login", json={"email": "admin@example.com", "password": "Admin123!"})
+    assert login.status_code == HTTPStatus.OK
+    tokens = login.json()
+    headers = auth_headers(tokens["access_token"])
+
+    simulate = client.post(
+        "/admin/security-events/simulate",
+        headers=headers,
+        json={"scenario": "jwt_invalid", "note": "test run"},
+    )
+    assert simulate.status_code == HTTPStatus.CREATED
+    created = simulate.json()
+    assert created["event_type"] == "auth_jwt_invalid"
+    assert created["status"] == "error"
+
+    events = client.get("/admin/security-events", headers=headers)
+    assert events.status_code == HTTPStatus.OK
+    event_ids = {event["id"] for event in events.json()}
+    assert created["id"] in event_ids

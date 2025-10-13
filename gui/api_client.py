@@ -292,4 +292,13 @@ class ApiClient:
     def delete_user(self, user_id: int) -> None:
         self._request("DELETE", f"/admin/users/{user_id}")
 
+    def simulate_security_event(self, scenario: str, note: str | None = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {"scenario": scenario}
+        if note:
+            payload["note"] = note
+        data = self._request("POST", "/admin/security-events/simulate", json=payload)
+        if not isinstance(data, dict):
+            raise ApiError(500, "Nie udalo sie utworzyc symulowanego zdarzenia.")
+        return data
+
     # endregion ---------------------------------------------------------------------
