@@ -16,15 +16,15 @@ class Settings(BaseSettings):
         description="SQLAlchemy database URI.",
     )
     jwt_secret_key: str = Field(
-        default="super-secret-change-me",
+        default="super-hiper-secret-token",
         description="Signing key for user access tokens.",
     )
     jwt_refresh_secret_key: str = Field(
-        default="refresh-secret-change-me",
+        default="refresh-super-hiper-secret-token",
         description="Signing key for user refresh tokens.",
     )
     jwt_device_secret_key: str = Field(
-        default="device-secret-change-me",
+        default="device-secret",
         description="Signing key for device access tokens.",
     )
     jwt_algorithm: str = "HS256"
