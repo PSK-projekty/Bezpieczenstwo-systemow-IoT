@@ -1,0 +1,42 @@
+@startuml
+title IoT Security Demo - Diagram komponentow
+left to right direction
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Arial
+
+component "PyQt5 GUI\n(gui/)" as GUI
+node "Urzadzenie IoT" as Device
+
+package "Backend FastAPI" {
+  component "FastAPI app\n(app/main.py)" as FastApp
+  component "Routery API\n(app/api/*.py)" as Routers
+  component "AuthService\n(app/services/auth_service.py)" as AuthSvc
+  component "DeviceService\n(app/services/device_service.py)" as DeviceSvc
+  component "ReadingService\n(app/services/reading_service.py)" as ReadingSvc
+  component "SecurityLogger\n(app/services/logging_service.py)" as SecuritySvc
+  component "Telemetry Simulator\n(app/services/simulator.py)" as Telemetry
+  database "SQLite\n(data/iot_demo.db)" as SQLite
+}
+
+GUI --> Routers : REST (JWT)
+Device --> Routers : REST (device JWT)
+
+FastApp --> Routers : include_router()
+FastApp --> Telemetry : uruchamia symulator
+
+Routers --> AuthSvc : zaleznosci
+Routers --> DeviceSvc
+Routers --> ReadingSvc
+Routers --> SecuritySvc : logi administracyjne
+
+AuthSvc --> SQLite : konta i tokeny
+DeviceSvc --> SQLite : dane urzadzen
+ReadingSvc --> SQLite : odczyty
+SecuritySvc --> SQLite : logi
+
+Telemetry --> DeviceSvc : pobiera aktywne
+Telemetry --> ReadingSvc : zapis odczytow
+
+@enduml

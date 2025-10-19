@@ -1,0 +1,68 @@
+@startuml
+scale 0.85
+title Sekwencja: urzadzenie wysyla odczyt telemetryczny
+skinparam ArrowColor #2c3e50
+skinparam ParticipantBackgroundColor #ecf0f1
+skinparam ParticipantBorderColor #34495e
+skinparam ParticipantFontName Arial
+skinparam sequenceMessageAlign center
+skinparam ParticipantPadding 6
+skinparam BoxPadding 8
+
+actor Uzytkownik
+participant "GUI PyQt5" as GUI
+participant "FastAPI Routers" as Routers
+participant "DeviceService" as DeviceSvc
+participant "ReadingService" as ReadingSvc
+participant "SecurityLogger" as SecuritySvc
+participant "Telemetry Simulator" as Simulator
+database "SQLite" as SQLite
+entity "Urzadzenie IoT" as Device
+
+== Provisioning ==
+Uzytkownik -> GUI : tworzy urzadzenie\n(pobiera sekret)
+GUI -> Routers : POST /devices
+Routers -> DeviceSvc : create_device()
+DeviceSvc -> SQLite : INSERT device
+Routers <-- DeviceSvc : urzadzenie + sekret
+GUI <-- Routers : device_id + secret
+GUI --> Uzytkownik : wyswietla dane
+
+== Uzyskanie tokenu ==
+Device -> Routers : POST /device/token
+Routers -> DeviceSvc : verify_secret()
+DeviceSvc -> SQLite : SELECT device + secret_hash
+DeviceSvc --> Routers : ok + token_version
+Routers -> SecuritySvc : log device_login
+SecuritySvc -> SQLite : INSERT security_event
+Routers --> Device : JWT urzadzenia
+
+== Wyslanie odczytu ==
+Device -> Routers : POST /device/readings
+Routers -> DeviceSvc : assert_token_version()
+Routers -> ReadingSvc : validate_limits()
+ReadingSvc -> SQLite : SELECT last_reading_at
+ReadingSvc --> Routers : limity OK
+Routers -> ReadingSvc : store_reading(payload)
+ReadingSvc -> SQLite : INSERT reading
+Routers -> SecuritySvc : log reading_ingested
+SecuritySvc -> SQLite : INSERT security_event
+Routers --> Device : 201 Created
+
+== Symulacja (opcjonalnie) ==
+Simulator -> DeviceSvc : pobiera aktywne urzadzenia
+Simulator -> Routers : POST /device/readings
+note right of Simulator
+Symulator wywoluje te same endpointy
+co fizyczne urzadzenie.
+end note
+
+== Dostep uzytkownika ==
+Uzytkownik -> GUI : zada podgladu danych
+GUI -> Routers : GET /devices/{id}/readings
+Routers -> ReadingSvc : list_readings(device_id)
+ReadingSvc -> SQLite : SELECT readings
+Routers --> GUI : odczyty telemetryczne
+GUI --> Uzytkownik : prezentuje wyniki
+
+@enduml

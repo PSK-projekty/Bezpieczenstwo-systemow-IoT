@@ -48,6 +48,11 @@ Zmienne srodowiskowe opisuje plik `.env.example`. Skopiuj go do `.env` i w razie
 - `ACCESS_TOKEN_EXP_MINUTES`, `REFRESH_TOKEN_EXP_MINUTES`, `DEVICE_TOKEN_EXP_MINUTES` - czasy zycia tokenow,
 - limity odczytow (`DATA_PAYLOAD_LIMIT_BYTES`, `MIN_SECONDS_BETWEEN_READINGS`).
 
+## Dokumentacja API
+
+- Swagger UI: http://127.0.0.1:8000/docs
+- Redoc: http://127.0.0.1:8000/redoc
+
 ## Uruchomienie backendu
 
 ```bash
@@ -63,8 +68,6 @@ Podczas startu:
 
 Przydatne adresy:
 
-- Swagger UI: http://127.0.0.1:8000/docs
-- Redoc: http://127.0.0.1:8000/redoc
 - Health check: http://127.0.0.1:8000/healthz
 
 ## Klient graficzny (PyQt5)
